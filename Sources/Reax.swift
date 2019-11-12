@@ -1,11 +1,3 @@
-//
-//  Reax.swift
-//  sequencer
-//
-//  Created by Thomas Crowley on 28/10/19.
-//  Copyright © 2019 Facebook. All rights reserved.
-//
-
 import Foundation
 
 public enum ReaxError: Encodable {
