@@ -1,7 +1,7 @@
 
 Pod::Spec.new do |s|
   s.name         = "RNReax"
-  s.version      = "1.1.1"
+  s.version      = "1.2.0"
   s.summary      = "RNReax"
   s.description  = <<-DESC
   Event driven RPC between a Swift backend and a Clojurescript front end. Influenced by the Xi-editor.
