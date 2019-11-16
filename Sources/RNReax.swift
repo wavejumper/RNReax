@@ -73,30 +73,37 @@ public func eventHandler<T>(_ type: T.Type) -> ((_ ctx: T.Context, _ from: Data)
   return decode
 }
 
-@objc
+@objc(ReaxEventEmitter)
 open class ReaxEventEmitter: RCTEventEmitter {
   let decoder = ReaxDecoder()
   let encoder = JSONEncoder()
 
-  func errorType() -> String {
+  public func errorType() -> String {
     let id = type(of: self)
     return "\(id)-error"
   }
 
-  func resultType() -> String {
+  public func resultType() -> String {
     let id = type(of: self)
     return "\(id)-result"
   }
 
+  @objc
   override open func constantsToExport() -> [AnyHashable: Any]! {
     return ["errorType": self.errorType(), "resultType": self.resultType()]
   }
-  
+
+  @objc
   override open func supportedEvents() -> [String]! {
-    [self.errorType(), self.resultType()]
+    return [self.errorType(), self.resultType()]
   }
 
-  func dispatchError(error: ReaxError) {
+  @objc
+  override public static func requiresMainQueueSetup() -> Bool {
+    return false
+  }
+
+  public func dispatchError(error: ReaxError) {
     if let jsonData = try? encoder.encode(error) {
       let jsonString = String(data: jsonData, encoding: .utf8)
       self.sendEvent(withName: self.errorType(), body: jsonString)
@@ -105,7 +112,7 @@ open class ReaxEventEmitter: RCTEventEmitter {
     }
   }
 
-  func dispatchResult<T>(result: T) where T: Encodable {
+  public func dispatchResult<T>(result: T) where T: Encodable {
     if let jsonData = try? encoder.encode(result) {
       let jsonString = String(data: jsonData, encoding: .utf8)
       self.sendEvent(withName: self.resultType(), body: jsonString)
