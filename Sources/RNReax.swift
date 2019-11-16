@@ -10,7 +10,7 @@ public enum ReaxError: Encodable {
     case .applicationError(let msg):
       try ["error": "applicationError", "message": msg].encode(to: encoder)
     }}
-  
+
   case deserializationError(String)
   case serializationError(String)
   case applicationError(String)
@@ -34,14 +34,14 @@ public enum Either<A, B> {
 public protocol ReaxHandler {
   associatedtype Context: ReaxContext
   associatedtype Result: Encodable
-  
+
   func invoke(ctx: Context) -> Either<Result, ReaxError>
 }
 
 open class ReaxDecoder {
   let decoder = JSONDecoder()
-  
-  func decode<T>(_ type: T.Type, from data: Data) -> Either<T, ReaxError> where T : Decodable {
+
+  func decode<T>(_ type: T.Type, from data: Data) -> Either<T, ReaxError> where T: Decodable {
     if let result = try? self.decoder.decode(type, from: data) {
       return Either.left(result)
     } else {
@@ -56,7 +56,7 @@ open class ReaxDecoder {
 public protocol ReaxRouter {
   associatedtype Context: ReaxContext
   associatedtype Result: Encodable
-  
+
   func routeEvent() -> ((_ ctx: Context, _ from: Data) -> Either<Result, ReaxError>)
 }
 
@@ -77,21 +77,21 @@ public func eventHandler<T>(_ type: T.Type) -> ((_ ctx: T.Context, _ from: Data)
 open class ReaxEventEmitter: RCTEventEmitter {
   let decoder = ReaxDecoder()
   let encoder = JSONEncoder()
-  
+
   func errorType() -> String {
     let id = type(of: self)
     return "\(id)-error"
   }
-  
+
   func resultType() -> String {
     let id = type(of: self)
     return "\(id)-result"
   }
-  
-  override open func constantsToExport() -> [AnyHashable : Any]! {
+
+  override open func constantsToExport() -> [AnyHashable: Any]! {
     return ["errorType": self.errorType(), "resultType": self.resultType()]
   }
-  
+
   func dispatchError(error: ReaxError) {
     if let jsonData = try? encoder.encode(error) {
       let jsonString = String(data: jsonData, encoding: .utf8)
@@ -100,7 +100,7 @@ open class ReaxEventEmitter: RCTEventEmitter {
       self.sendEvent(withName: self.errorType(), body: "FAIL")
     }
   }
-  
+
   func dispatchResult<T>(result: T) where T: Encodable {
     if let jsonData = try? encoder.encode(result) {
       let jsonString = String(data: jsonData, encoding: .utf8)
@@ -110,7 +110,7 @@ open class ReaxEventEmitter: RCTEventEmitter {
       self.dispatchError(error: err)
     }
   }
-  
+
   public func channelFactory<T>(_ type: T.Type) -> ((_ result: Either<T, ReaxError>) -> Void) where T: Encodable {
     func channel (_ result: Either<T, ReaxError>) {
       switch result {
@@ -122,7 +122,7 @@ open class ReaxEventEmitter: RCTEventEmitter {
     }
     return channel
   }
-  
+
   public func invoke<T>(_ type: T.Type, ctx: T.Context, id: String, args: String) where T: ReaxRouter & Decodable {
     if let eventData = id.data(using: .utf8) {
       switch decoder.decode(type, from: eventData) {
