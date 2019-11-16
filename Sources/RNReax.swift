@@ -91,6 +91,10 @@ open class ReaxEventEmitter: RCTEventEmitter {
   override open func constantsToExport() -> [AnyHashable: Any]! {
     return ["errorType": self.errorType(), "resultType": self.resultType()]
   }
+  
+  override open func supportedEvents() -> [String]! {
+    [self.errorType(), self.resultType()]
+  }
 
   func dispatchError(error: ReaxError) {
     if let jsonData = try? encoder.encode(error) {
