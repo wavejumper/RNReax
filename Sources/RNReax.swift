@@ -1,36 +1,25 @@
-//
-//  Reax.swift
-//  sequencer
-//
-//  Created by Thomas Crowley on 28/10/19.
-//  Copyright © 2019 Facebook. All rights reserved.
-//
-
 import Foundation
 
 public enum ReaxError: Encodable {
   public func encode(to encoder: Encoder) throws {
     switch self {
-    case .DeserializationError(let msg):
-      try ["error": "DeserializationError", "message": msg].encode(to: encoder)
-    case .SerializationError(let msg):
-      try ["error": "SerializationError", "message": msg].encode(to: encoder)
-    case .InternalServerError(let msg):
-      try ["error": "InternalServerError", "message": msg].encode(to: encoder)
-    case .ApplicationError(let msg):
-      try ["error": "ApplicationError", "message": msg].encode(to: encoder)
+    case .deserializationError(let msg):
+      try ["error": "deserializationError", "message": msg].encode(to: encoder)
+    case .serializationError(let msg):
+      try ["error": "serializationError", "message": msg].encode(to: encoder)
+    case .applicationError(let msg):
+      try ["error": "applicationError", "message": msg].encode(to: encoder)
     }}
   
-  case DeserializationError(String)
-  case SerializationError(String)
-  case InternalServerError(String)
-  case ApplicationError(String)
+  case deserializationError(String)
+  case serializationError(String)
+  case applicationError(String)
 }
 
 public enum ReaxContextState {
-  case Started
-  case Stopped
-  case Error
+  case started
+  case stopped
+  case error
 }
 
 public protocol ReaxContext {
@@ -38,11 +27,11 @@ public protocol ReaxContext {
 }
 
 public enum Either<A, B> {
-  case Left(A)
-  case Right(B)
+  case left(A)
+  case right(B)
 }
 
-public protocol ReaxMutation {
+public protocol ReaxHandler {
   associatedtype Context: ReaxContext
   associatedtype Result: Encodable
   
@@ -54,37 +43,36 @@ open class ReaxDecoder {
   
   func decode<T>(_ type: T.Type, from data: Data) -> Either<T, ReaxError> where T : Decodable {
     if let result = try? self.decoder.decode(type, from: data) {
-      return Either.Left(result)
+      return Either.left(result)
     } else {
       let dataStr = String(data: data, encoding: .utf8) ?? "Unknown"
       let errStr = "Failed to decode: " + dataStr
-      let err = ReaxError.DeserializationError(errStr)
-      return Either.Right(err)
+      let err = ReaxError.deserializationError(errStr)
+      return Either.right(err)
     }
   }
 }
 
-public protocol ReaxEventRouter {
+public protocol ReaxRouter {
   associatedtype Context: ReaxContext
   associatedtype Result: Encodable
   
   func routeEvent() -> ((_ ctx: Context, _ from: Data) -> Either<Result, ReaxError>)
 }
 
-public func mutationFactory<T>(_ type: T.Type) -> ((_ ctx: T.Context, _ from: Data) -> Either<T.Result, ReaxError>) where T: Codable & ReaxMutation {
+public func eventHandler<T>(_ type: T.Type) -> ((_ ctx: T.Context, _ from: Data) -> Either<T.Result, ReaxError>) where T: Codable & ReaxHandler {
   let decoder = ReaxDecoder()
   func decode (_ ctx: T.Context, _ from: Data) -> Either<T.Result, ReaxError> {
     switch decoder.decode(type, from: from) {
-    case .Left(let result):
+    case .left(let result):
       return result.invoke(ctx: ctx)
-    case .Right(let err):
-      return Either.Right(err)
+    case .right(let err):
+      return Either.right(err)
     }
   }
   return decode
 }
 
-// IMPL...
 @objc
 open class ReaxEventEmitter: RCTEventEmitter {
   let decoder = ReaxDecoder()
@@ -118,7 +106,7 @@ open class ReaxEventEmitter: RCTEventEmitter {
       let jsonString = String(data: jsonData, encoding: .utf8)
       self.sendEvent(withName: self.resultType(), body: jsonString)
     } else {
-      let err = ReaxError.SerializationError("Failed to serailize result")
+      let err = ReaxError.serializationError("Failed to serailize result")
       self.dispatchError(error: err)
     }
   }
@@ -126,36 +114,36 @@ open class ReaxEventEmitter: RCTEventEmitter {
   public func channelFactory<T>(_ type: T.Type) -> ((_ result: Either<T, ReaxError>) -> Void) where T: Encodable {
     func channel (_ result: Either<T, ReaxError>) {
       switch result {
-      case .Left(let result):
+      case .left(let result):
         self.dispatchResult(result: result)
-      case .Right(let err):
+      case .right(let err):
         self.dispatchError(error: err)
       }
     }
     return channel
   }
   
-  public func invoke<T>(_ type: T.Type, ctx: T.Context, id: String, args: String) where T: ReaxEventRouter & Decodable {
+  public func invoke<T>(_ type: T.Type, ctx: T.Context, id: String, args: String) where T: ReaxRouter & Decodable {
     if let eventData = id.data(using: .utf8) {
       switch decoder.decode(type, from: eventData) {
-      case .Left(let router):
+      case .left(let router):
         let invokeMutation = router.routeEvent()
         if let argsData = args.data(using: .utf8) {
           switch invokeMutation(ctx, argsData) {
-          case .Left(let result):
+          case .left(let result):
             self.dispatchResult(result: result)
-          case .Right(let err):
+          case .right(let err):
             self.dispatchError(error: err)
           }
         } else {
-          let err = ReaxError.DeserializationError("Failed to deserialize incoming args")
+          let err = ReaxError.deserializationError("Failed to deserialize incoming args")
           self.dispatchError(error: err)
         }
-      case .Right(let err):
+      case .right(let err):
         self.dispatchError(error: err)
       }
     } else {
-      let err = ReaxError.DeserializationError("Failed to deserialize incoming event id")
+      let err = ReaxError.deserializationError("Failed to deserialize incoming event id")
       self.dispatchError(error: err)
     }
   }
